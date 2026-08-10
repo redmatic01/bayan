@@ -1,0 +1,17 @@
+name = "bayan"
+main = "src/index.js"
+compatibility_date = "2026-07-01"
+workers_dev = true
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bayan"
+database_id = "DATABASE_ID_PLACEHOLDER"
+
+[observability]
+enabled = true

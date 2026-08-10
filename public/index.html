@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Баян</title>
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f4ef">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#131316">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<style>
+:root {
+  --bg: #f6f4ef; --card: #ffffff; --text: #1c1b19; --muted: #8a867d;
+  --accent: #c98a00; --line: #e6e2d8; --danger: #b3402e; --ok: #3d7a3d;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131316; --card: #1d1d22; --text: #e8e6e1; --muted: #77747c;
+    --accent: #f0b429; --line: #2a2a31; --danger: #e06c55; --ok: #6cb56c;
+  }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 17px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overscroll-behavior: none;
+}
+#app { display: flex; flex-direction: column; height: 100dvh; }
+
+header {
+  display: flex; align-items: center; gap: 8px;
+  padding: calc(env(safe-area-inset-top) + 10px) 16px 8px;
+}
+header h1 { font-size: 17px; margin: 0; font-weight: 700; letter-spacing: .02em; }
+header .spacer { flex: 1; }
+header .counter { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+
+#tagbar { display: flex; gap: 6px; overflow-x: auto; padding: 2px 16px 8px; scrollbar-width: none; }
+#tagbar::-webkit-scrollbar { display: none; }
+.chip {
+  flex: 0 0 auto; border: 1px solid var(--line); border-radius: 999px;
+  padding: 3px 12px; font-size: 13px; color: var(--muted); background: none; cursor: pointer;
+}
+.chip.active { border-color: var(--accent); color: var(--accent); }
+
+main { flex: 1; min-height: 0; position: relative; }
+
+/* --- карточка --- */
+.stage { position: absolute; inset: 0; padding: 4px 16px 12px; display: flex; }
+.card {
+  flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+  padding: 22px 20px; display: flex; flex-direction: column;
+  box-shadow: 0 4px 18px rgba(0,0,0,.06);
+  touch-action: pan-y; user-select: none; position: relative; overflow: hidden;
+}
+.card .body {
+  flex: 1; overflow-y: auto; display: flex; align-items: center;
+  font-size: 20px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
+}
+.card .body > div { max-height: 100%; width: 100%; }
+.card .meta { color: var(--muted); font-size: 13px; padding-top: 10px; display: flex; gap: 10px; }
+.card .stamp {
+  position: absolute; top: 18px; font-size: 30px; font-weight: 800; opacity: 0;
+  border: 3px solid; border-radius: 10px; padding: 2px 12px; transform: rotate(-12deg);
+  pointer-events: none;
+}
+.card .stamp.yes { left: 16px; color: var(--ok); border-color: var(--ok); }
+.card .stamp.no { right: 16px; color: var(--danger); border-color: var(--danger); transform: rotate(12deg); }
+
+.actions { display: flex; justify-content: center; gap: 18px; padding: 0 16px 10px; }
+.abtn {
+  width: 54px; height: 54px; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--card); font-size: 22px; cursor: pointer; color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+}
+.abtn:active { transform: scale(.92); }
+.abtn.fav.on { color: var(--danger); }
+.abtn.big { width: 62px; height: 62px; font-size: 26px; }
+.abtn.ok { color: var(--ok); } .abtn.no { color: var(--danger); }
+
+nav {
+  display: flex; border-top: 1px solid var(--line); background: var(--card);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+nav button {
+  flex: 1; background: none; border: 0; padding: 9px 0 7px; color: var(--muted);
+  font-size: 11px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+nav button .ico { font-size: 21px; line-height: 1; }
+nav button.active { color: var(--accent); }
+nav button .badge {
+  position: absolute; margin-left: 26px; margin-top: -4px; background: var(--accent); color: #fff;
+  border-radius: 999px; font-size: 10px; min-width: 16px; padding: 1px 4px; font-weight: 700;
+}
+
+/* --- списки (избранное/поиск) --- */
+.list { position: absolute; inset: 0; overflow-y: auto; padding: 4px 16px 16px; }
+.list .item {
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px 16px; margin-bottom: 10px; white-space: pre-wrap; word-break: break-word; font-size: 16px;
+}
+.list .item .meta { color: var(--muted); font-size: 12px; margin-top: 8px; display: flex; gap: 12px; align-items: center; }
+.list .item .meta button { background: none; border: 0; cursor: pointer; font-size: 16px; padding: 0; color: var(--muted); }
+.list .item .meta button.on { color: var(--danger); }
+.searchbox { position: sticky; top: 0; padding: 2px 0 10px; background: var(--bg); }
+.searchbox input {
+  width: 100%; border: 1px solid var(--line); border-radius: 12px; background: var(--card);
+  color: var(--text); font-size: 16px; padding: 11px 14px; outline: none;
+}
+.empty { color: var(--muted); text-align: center; margin-top: 40vh; transform: translateY(-50%); padding: 0 30px; }
+.center-btn {
+  display: block; margin: 14px auto 0; border: 1px solid var(--accent); color: var(--accent);
+  background: none; border-radius: 999px; padding: 9px 22px; font-size: 15px; cursor: pointer;
+}
+#ingestlog { font-size: 13px; color: var(--muted); white-space: pre-line; text-align: left; margin-top: 12px; }
+
+#toast {
+  position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%);
+  background: var(--text); color: var(--bg); border-radius: 999px; padding: 8px 18px;
+  font-size: 14px; opacity: 0; transition: opacity .25s; pointer-events: none; max-width: 86vw; text-align: center;
+}
+#toast.show { opacity: .92; }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1 id="title">Баян</h1>
+    <div class="spacer"></div>
+    <div class="counter" id="counter"></div>
+  </header>
+  <div id="tagbar" class="hidden"></div>
+  <main id="main"></main>
+  <div class="actions" id="actions"></div>
+  <nav>
+    <button data-view="reader"><span class="ico">📖</span>Читалка</button>
+    <button data-view="review"><span class="badge hidden" id="qbadge"></span><span class="ico">🃏</span>Разбор</button>
+    <button data-view="favs"><span class="ico">♥</span>Избранное</button>
+    <button data-view="search"><span class="ico">🔍</span>Поиск</button>
+  </nav>
+</div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+// ---------- состояние ----------
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { localStorage.setItem(k, JSON.stringify(v)); },
+};
+let bank = LS.get('bayan_bank_cache', []);      // [{id,text,tags,source}]
+let deck = LS.get('bayan_deck_v1', null);        // {order:[ids], pos, tag}
+let favs = new Set(LS.get('bayan_favs', []));
+let queue = [];                                  // кандидаты на разбор
+let queueTotal = 0;
+let view = 'reader';
+
+const $ = (s) => document.querySelector(s);
+const main = $('#main'), actions = $('#actions'), counter = $('#counter'), tagbar = $('#tagbar');
+
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 1800);
+}
+const vibrate = (ms) => navigator.vibrate && navigator.vibrate(ms);
+const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+// ---------- данные ----------
+async function loadBank() {
+  try {
+    const r = await fetch('/api/bank');
+    if (!r.ok) throw 0;
+    bank = (await r.json()).items;
+    LS.set('bayan_bank_cache', bank);
+  } catch { /* офлайн — живём на кэше */ }
+  syncDeck();
+}
+async function loadQueue() {
+  try {
+    const r = await fetch('/api/queue');
+    if (!r.ok) throw 0;
+    const d = await r.json();
+    queue = d.items; queueTotal = d.total;
+  } catch { queue = null; }
+  updateBadge();
+}
+function updateBadge() {
+  const b = $('#qbadge');
+  if (queue && queueTotal > 0) { b.textContent = queueTotal > 99 ? '99+' : queueTotal; b.classList.remove('hidden'); }
+  else b.classList.add('hidden');
+}
+
+// ---------- колода ----------
+function activeIds() {
+  const tag = deck && deck.tag || '';
+  return bank.filter((it) => !tag || (it.tags || '').split(',').map((s) => s.trim()).includes(tag)).map((it) => it.id);
+}
+function syncDeck() {
+  const ids = activeIds();
+  const idset = new Set(ids);
+  if (!deck || !Array.isArray(deck.order)) deck = { order: shuffle([...ids]), pos: 0, tag: '' };
+  else {
+    const seen = new Set(deck.order);
+    deck.order = deck.order.filter((id) => idset.has(id));
+    if (deck.pos > deck.order.length) deck.pos = deck.order.length;
+    const fresh = shuffle(ids.filter((id) => !seen.has(id)));
+    // новые вмешиваем в непрочитанный хвост
+    for (const id of fresh) {
+      const lo = Math.min(deck.pos, deck.order.length);
+      const at = lo + Math.floor(Math.random() * (deck.order.length - lo + 1));
+      deck.order.splice(at, 0, id);
+    }
+  }
+  LS.set('bayan_deck_v1', deck);
+  if (view === 'reader') render();
+}
+function reshuffle() {
+  deck = { order: shuffle(activeIds()), pos: 0, tag: deck ? deck.tag : '' };
+  LS.set('bayan_deck_v1', deck);
+  render();
+}
+function allTags() {
+  const s = new Set();
+  for (const it of bank) for (const t of (it.tags || '').split(',')) if (t.trim()) s.add(t.trim());
+  return [...s].sort();
+}
+
+// ---------- свайп ----------
+function attachSwipe(card, { onLeft, onRight }) {
+  let x0 = null, y0 = null, dx = 0, dragging = false;
+  const yes = card.querySelector('.stamp.yes'), no = card.querySelector('.stamp.no');
+  card.addEventListener('pointerdown', (e) => { x0 = e.clientX; y0 = e.clientY; dx = 0; dragging = true; card.style.transition = 'none'; });
+  card.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    dx = e.clientX - x0;
+    if (Math.abs(e.clientY - y0) > 90 && Math.abs(dx) < 40) return;
+    card.style.transform = `translateX(${dx}px) rotate(${dx / 22}deg)`;
+    if (yes) yes.style.opacity = Math.max(0, Math.min(1, dx / 80));
+    if (no) no.style.opacity = Math.max(0, Math.min(1, -dx / 80));
+  });
+  const end = () => {
+    if (!dragging) return; dragging = false;
+    card.style.transition = 'transform .22s ease';
+    if (dx > 70 && onRight) { card.style.transform = 'translateX(120vw) rotate(20deg)'; setTimeout(onRight, 160); }
+    else if (dx < -70 && onLeft) { card.style.transform = 'translateX(-120vw) rotate(-20deg)'; setTimeout(onLeft, 160); }
+    else { card.style.transform = ''; if (yes) yes.style.opacity = 0; if (no) no.style.opacity = 0; }
+  };
+  card.addEventListener('pointerup', end);
+  card.addEventListener('pointercancel', end);
+}
+
+// ---------- шаринг ----------
+async function share(text) {
+  try {
+    if (navigator.share) await navigator.share({ text });
+    else { await navigator.clipboard.writeText(text); toast('Скопировано'); }
+  } catch { /* отменил — ок */ }
+}
+function toggleFav(id, btn) {
+  if (favs.has(id)) { favs.delete(id); btn && btn.classList.remove('on'); }
+  else { favs.add(id); btn && btn.classList.add('on'); vibrate(10); }
+  LS.set('bayan_favs', [...favs]);
+}
+
+// ---------- экраны ----------
+function render() {
+  document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  tagbar.classList.add('hidden');
+  actions.innerHTML = ''; counter.textContent = '';
+  if (view === 'reader') renderReader();
+  else if (view === 'review') renderReview();
+  else if (view === 'favs') renderFavs();
+  else renderSearch();
+}
+
+function cardEl(text, meta, stamps) {
+  const c = document.createElement('div');
+  c.className = 'card';
+  c.innerHTML = (stamps ? '<div class="stamp yes">В банк</div><div class="stamp no">Мимо</div>' : '')
+    + '<div class="body"><div></div></div><div class="meta"></div>';
+  c.querySelector('.body > div').textContent = text;
+  c.querySelector('.meta').textContent = meta || '';
+  return c;
+}
+
+function renderReader() {
+  $('#title').textContent = 'Баян';
+  // тег-фильтр
+  const tags = allTags();
+  if (tags.length) {
+    tagbar.classList.remove('hidden');
+    tagbar.innerHTML = '';
+    const mk = (label, val) => {
+      const b = document.createElement('button');
+      b.className = 'chip' + ((deck.tag || '') === val ? ' active' : '');
+      b.textContent = label;
+      b.onclick = () => { deck.tag = val; reshuffle(); };
+      return b;
+    };
+    tagbar.append(mk('все', ''));
+    for (const t of tags) tagbar.append(mk(t, t));
+  }
+  main.innerHTML = '';
+  const stage = document.createElement('div'); stage.className = 'stage'; main.append(stage);
+
+  if (!bank.length) {
+    stage.innerHTML = '<div class="empty">Банк пуст.\nЗайди в «Разбор» — одобри первых кандидатов.</div>';
+    return;
+  }
+  if (deck.pos >= deck.order.length) {
+    const d = document.createElement('div'); d.className = 'empty';
+    d.textContent = 'Колода кончилась — ты прочитал всё.';
+    const b = document.createElement('button'); b.className = 'center-btn'; b.textContent = 'Перетасовать';
+    b.onclick = reshuffle; d.append(b); stage.append(d);
+    counter.textContent = `${deck.order.length}/${deck.order.length}`;
+    return;
+  }
+  const id = deck.order[deck.pos];
+  const it = bank.find((x) => x.id === id);
+  if (!it) { deck.pos++; LS.set('bayan_deck_v1', deck); return renderReader(); }
+  counter.textContent = `${deck.pos + 1}/${deck.order.length}`;
+
+  const c = cardEl(it.text, [it.tags, it.source].filter(Boolean).join(' · '), false);
+  stage.append(c);
+  const next = () => { if (deck.pos < deck.order.length) { deck.pos++; LS.set('bayan_deck_v1', deck); render(); } };
+  const prev = () => { if (deck.pos > 0) { deck.pos--; LS.set('bayan_deck_v1', deck); render(); } };
+  attachSwipe(c, { onLeft: next, onRight: prev });
+
+  const mkA = (cls, html, fn, title) => { const b = document.createElement('button'); b.className = 'abtn ' + cls; b.innerHTML = html; b.onclick = fn; b.title = title || ''; return b; };
+  const favBtn = mkA('fav' + (favs.has(id) ? ' on' : ''), '♥', () => toggleFav(id, favBtn), 'В избранное');
+  actions.append(
+    mkA('', '↩', prev, 'Предыдущий'),
+    favBtn,
+    mkA('', '↗', () => share(it.text), 'Поделиться'),
+    mkA('big', '→', next, 'Следующий'),
+  );
+}
+
+function renderReview() {
+  $('#title').textContent = 'Разбор';
+  main.innerHTML = '';
+  const stage = document.createElement('div'); stage.className = 'stage'; main.append(stage);
+
+  if (queue === null) { stage.innerHTML = '<div class="empty">Нет сети — разбор работает только онлайн.</div>'; return; }
+  if (!queue.length) {
+    const d = document.createElement('div'); d.className = 'empty';
+    d.textContent = 'Очередь пуста.';
+    const b = document.createElement('button'); b.className = 'center-btn'; b.textContent = 'Принести свежих';
+    b.onclick = () => ingest(d);
+    const log = document.createElement('div'); log.id = 'ingestlog';
+    d.append(b, log); stage.append(d);
+    counter.textContent = '';
+    return;
+  }
+  const it = queue[0];
+  counter.textContent = `в очереди: ${queueTotal}`;
+  const c = cardEl(it.text, it.source, true);
+  stage.append(c);
+
+  const decide = async (action) => {
+    queue.shift(); queueTotal--; vibrate(12); updateBadge(); render();
+    try {
+      await fetch('/api/decide', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: it.id, action }) });
+      if (action === 'approve') loadBank();
+    } catch { toast('Не сохранилось — нет сети'); }
+  };
+  attachSwipe(c, { onRight: () => decide('approve'), onLeft: () => decide('reject') });
+
+  const mkA = (cls, html, fn) => { const b = document.createElement('button'); b.className = 'abtn ' + cls; b.innerHTML = html; b.onclick = fn; return b; };
+  actions.append(
+    mkA('big no', '✕', () => decide('reject')),
+    mkA('', '↗', () => share(it.text)),
+    mkA('big ok', '✓', () => decide('approve')),
+  );
+}
+
+async function ingest(container) {
+  const log = container.querySelector('#ingestlog') || $('#ingestlog');
+  const btn = container.querySelector('.center-btn');
+  if (btn) btn.disabled = true;
+  log.textContent = 'Иду по источникам…';
+  try {
+    const sources = (await (await fetch('/api/sources')).json()).sources;
+    const lines = [];
+    for (let i = 0; i < sources.length; i++) {
+      lines[i] = `${sources[i].name}: …`; log.textContent = lines.join('\n');
+      try {
+        const r = await (await fetch('/api/ingest', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ index: i }) })).json();
+        lines[i] = r.error ? `${r.source}: ошибка` : `${r.source}: +${r.added} (из ${r.found})`;
+      } catch { lines[i] = `${sources[i].name}: ошибка сети`; }
+      log.textContent = lines.join('\n');
+    }
+    await loadQueue();
+    setTimeout(render, 900);
+  } catch {
+    log.textContent = 'Не получилось — нет сети?';
+    if (btn) btn.disabled = false;
+  }
+}
+
+function listItem(it) {
+  const d = document.createElement('div'); d.className = 'item';
+  const body = document.createElement('div'); body.textContent = it.text;
+  const meta = document.createElement('div'); meta.className = 'meta';
+  const fav = document.createElement('button'); fav.textContent = '♥'; fav.className = favs.has(it.id) ? 'on' : '';
+  fav.onclick = () => { toggleFav(it.id, fav); if (view === 'favs') render(); };
+  const sh = document.createElement('button'); sh.textContent = '↗'; sh.onclick = () => share(it.text);
+  const src = document.createElement('span'); src.textContent = [it.tags, it.source].filter(Boolean).join(' · ');
+  meta.append(fav, sh, src);
+  d.append(body, meta);
+  return d;
+}
+
+function renderFavs() {
+  $('#title').textContent = 'Избранное';
+  main.innerHTML = '';
+  const list = document.createElement('div'); list.className = 'list'; main.append(list);
+  const items = bank.filter((it) => favs.has(it.id));
+  counter.textContent = items.length || '';
+  if (!items.length) { list.innerHTML = '<div class="empty">Пока пусто — жми ♥ на карточке.</div>'; return; }
+  for (const it of items) list.append(listItem(it));
+}
+
+function renderSearch() {
+  $('#title').textContent = 'Поиск';
+  main.innerHTML = '';
+  const list = document.createElement('div'); list.className = 'list'; main.append(list);
+  const box = document.createElement('div'); box.className = 'searchbox';
+  const inp = document.createElement('input');
+  inp.placeholder = 'Найти тот самый…'; inp.type = 'search';
+  box.append(inp); list.append(box);
+  const res = document.createElement('div'); list.append(res);
+  const run = () => {
+    const q = inp.value.trim().toLowerCase().replace(/ё/g, 'е');
+    res.innerHTML = '';
+    if (q.length < 2) { counter.textContent = ''; return; }
+    const hits = bank.filter((it) => it.text.toLowerCase().replace(/ё/g, 'е').includes(q));
+    counter.textContent = hits.length || '0';
+    if (!hits.length) { res.innerHTML = '<div class="empty" style="margin-top:20vh">Ничего не нашлось.</div>'; return; }
+    for (const it of hits.slice(0, 50)) res.append(listItem(it));
+  };
+  inp.addEventListener('input', run);
+  setTimeout(() => inp.focus(), 50);
+}
+
+// ---------- навигация и старт ----------
+document.querySelectorAll('nav button').forEach((b) => {
+  b.onclick = () => { view = b.dataset.view; if (view === 'review') loadQueue().then(render); render(); };
+});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+syncDeck();
+render();
+loadBank();
+loadQueue();
+</script>
+</body>
+</html>

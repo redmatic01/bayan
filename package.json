@@ -1,0 +1,13 @@
+{
+  "name": "bayan",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Карманная коллекция анекдотов: PWA на Cloudflare Workers + D1",
+  "scripts": {
+    "dev": "wrangler dev --port 3090",
+    "db:local": "wrangler d1 execute bayan --local --file=schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^3.114.17"
+  }
+}

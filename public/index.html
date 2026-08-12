@@ -4,8 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баян</title>
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fffefb">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#201515">
+<meta name="theme-color" content="#fffefb">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/icon-192.png">
@@ -19,14 +18,8 @@
   --ok: #ff4f00;      /* «в банк» — единственное вивидное действие */
   --danger: #939084;  /* «мимо» — тихий отказ, не тревога */
 }
-@media (prefers-color-scheme: dark) {
-  /* Тёмная тема — это подвал Zapier: тёплый чёрный, кремовый текст, песочные рамки. */
-  :root {
-    --bg: #201515; --card: #2b1e1e; --surface: #36342e; --text: #fffefb; --body: #e4e0d7;
-    --muted: #a8a49a; --accent: #ff5c14; --line: #4a3a36;
-    --ok: #ff5c14; --danger: #a8a49a;
-  }
-}
+/* Тёмная тема отключена по запросу — приложение всегда светлое,
+   независимо от системной темы телефона. */
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; }
 body {

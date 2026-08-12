@@ -76,8 +76,12 @@ main { flex: 1; min-height: 0; position: relative; }
   display: flex; align-items: center; justify-content: center;
 }
 .abtn:active { transform: scale(.92); }
-.abtn.fav.on { color: var(--danger); }
-.abtn.big { width: 62px; height: 62px; font-size: 26px; }
+.abtn .ico-svg { width: 23px; height: 23px; }
+/* избранное — активное действие, ему единственному положен акцент; --danger тут был бы почти не виден */
+.abtn.fav.on { color: var(--accent); }
+.abtn.fav.on .ico-svg { fill: currentColor; }
+.abtn.big { width: 62px; height: 62px; }
+.abtn.big .ico-svg { width: 27px; height: 27px; }
 .abtn.ok { color: var(--ok); } .abtn.no { color: var(--danger); }
 
 nav {
@@ -88,7 +92,8 @@ nav button {
   flex: 1; background: none; border: 0; padding: 9px 0 7px; color: var(--muted);
   font-size: 11px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px;
 }
-nav button .ico { font-size: 21px; line-height: 1; }
+nav button .ico { line-height: 1; }
+nav button .ico-svg { width: 21px; height: 21px; }
 /* приём Zapier: активная вкладка помечается полосой (inset box-shadow), а не цветом текста */
 nav button.active { color: var(--text); box-shadow: inset 0 3px 0 0 var(--accent); }
 nav button .badge {
@@ -104,8 +109,10 @@ nav button .badge {
   font-size: 16px; color: var(--body);
 }
 .list .item .meta { color: var(--muted); font-size: 12px; margin-top: 8px; display: flex; gap: 12px; align-items: center; }
-.list .item .meta button { background: none; border: 0; cursor: pointer; font-size: 16px; padding: 0; color: var(--muted); }
-.list .item .meta button.on { color: var(--danger); }
+.list .item .meta button { background: none; border: 0; cursor: pointer; padding: 0; color: var(--muted); display: flex; }
+.list .item .meta button .ico-svg { width: 17px; height: 17px; }
+.list .item .meta button.on { color: var(--accent); }
+.list .item .meta button.on .ico-svg { fill: currentColor; }
 .searchbox { position: sticky; top: 0; padding: 2px 0 10px; background: var(--bg); }
 .searchbox input {
   width: 100%; border: 1px solid var(--line); border-radius: 5px; background: var(--card);
@@ -142,10 +149,10 @@ nav button .badge {
   <main id="main"></main>
   <div class="actions" id="actions"></div>
   <nav>
-    <button data-view="reader"><span class="ico">📖</span>Читалка</button>
-    <button data-view="review"><span class="badge hidden" id="qbadge"></span><span class="ico">🃏</span>Разбор</button>
-    <button data-view="favs"><span class="ico">♥</span>Избранное</button>
-    <button data-view="search"><span class="ico">🔍</span>Поиск</button>
+    <button data-view="reader"><span class="ico" data-icon="book"></span>Читалка</button>
+    <button data-view="review"><span class="badge hidden" id="qbadge"></span><span class="ico" data-icon="cards"></span>Разбор</button>
+    <button data-view="favs"><span class="ico" data-icon="heart"></span>Избранное</button>
+    <button data-view="search"><span class="ico" data-icon="search"></span>Поиск</button>
   </nav>
 </div>
 <div id="toast"></div>
@@ -157,6 +164,23 @@ const LS = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { localStorage.setItem(k, JSON.stringify(v)); },
 };
+
+// ---------- иконки (монолиния, без эмодзи — унаследует var(--text)/var(--accent) от кнопки) ----------
+const ICON_PATHS = {
+  book: '<path d="M12 6.8C10.6 5.7 8.6 5 6.5 5c-.9 0-1.7.1-2.5.3v12.4c.8-.2 1.6-.3 2.5-.3 2.1 0 4.1.7 5.5 1.8 1.4-1.1 3.4-1.8 5.5-1.8.9 0 1.7.1 2.5.3V5.3c-.8-.2-1.6-.3-2.5-.3-2.1 0-4.1.7-5.5 1.8z"/><path d="M12 6.8v12.4"/>',
+  cards: '<rect x="3.2" y="6.6" width="13.2" height="14.2" rx="2.4"/><rect x="7.6" y="3.2" width="13.2" height="14.2" rx="2.4" fill="var(--card)"/>',
+  heart: '<path d="M20.84 6.11a5.5 5.5 0 0 0-7.78 0L12 7.17l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 22.73l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
+  search: '<circle cx="10.3" cy="10.3" r="6.3"/><path d="M20 20l-5.2-5.2"/>',
+  back: '<path d="M19 12H6M11 6l-6 6 6 6"/>',
+  forward: '<path d="M5 12h13M13 6l6 6-6 6"/>',
+  share: '<path d="M7 17 17 7M9 7h8v8"/>',
+  check: '<path d="M5 13l4.5 4.5L19 8"/>',
+  cross: '<path d="M6 6l12 12M18 6 6 18"/>',
+};
+function icon(name) {
+  return `<svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[name]}</svg>`;
+}
+document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = icon(el.dataset.icon); });
 let bank = LS.get('bayan_bank_cache', []);      // [{id,text,tags,source}]
 let deck = LS.get('bayan_deck_v1', null);        // {order:[ids], pos, tag}
 let favs = new Set(LS.get('bayan_favs', []));
@@ -336,12 +360,12 @@ function renderReader() {
   attachSwipe(c, { onLeft: next, onRight: prev });
 
   const mkA = (cls, html, fn, title) => { const b = document.createElement('button'); b.className = 'abtn ' + cls; b.innerHTML = html; b.onclick = fn; b.title = title || ''; return b; };
-  const favBtn = mkA('fav' + (favs.has(id) ? ' on' : ''), '♥', () => toggleFav(id, favBtn), 'В избранное');
+  const favBtn = mkA('fav' + (favs.has(id) ? ' on' : ''), icon('heart'), () => toggleFav(id, favBtn), 'В избранное');
   actions.append(
-    mkA('', '↩', prev, 'Предыдущий'),
+    mkA('', icon('back'), prev, 'Предыдущий'),
     favBtn,
-    mkA('', '↗', () => share(it.text), 'Поделиться'),
-    mkA('big', '→', next, 'Следующий'),
+    mkA('', icon('share'), () => share(it.text), 'Поделиться'),
+    mkA('big', icon('forward'), next, 'Следующий'),
   );
 }
 
@@ -377,9 +401,9 @@ function renderReview() {
 
   const mkA = (cls, html, fn) => { const b = document.createElement('button'); b.className = 'abtn ' + cls; b.innerHTML = html; b.onclick = fn; return b; };
   actions.append(
-    mkA('big no', '✕', () => decide('reject')),
-    mkA('', '↗', () => share(it.text)),
-    mkA('big ok', '✓', () => decide('approve')),
+    mkA('big no', icon('cross'), () => decide('reject')),
+    mkA('', icon('share'), () => share(it.text)),
+    mkA('big ok', icon('check'), () => decide('approve')),
   );
 }
 
@@ -411,9 +435,9 @@ function listItem(it) {
   const d = document.createElement('div'); d.className = 'item';
   const body = document.createElement('div'); body.textContent = it.text;
   const meta = document.createElement('div'); meta.className = 'meta';
-  const fav = document.createElement('button'); fav.textContent = '♥'; fav.className = favs.has(it.id) ? 'on' : '';
+  const fav = document.createElement('button'); fav.innerHTML = icon('heart'); fav.className = favs.has(it.id) ? 'on' : '';
   fav.onclick = () => { toggleFav(it.id, fav); if (view === 'favs') render(); };
-  const sh = document.createElement('button'); sh.textContent = '↗'; sh.onclick = () => share(it.text);
+  const sh = document.createElement('button'); sh.innerHTML = icon('share'); sh.onclick = () => share(it.text);
   const src = document.createElement('span'); src.textContent = [it.tags, it.source].filter(Boolean).join(' · ');
   meta.append(fav, sh, src);
   d.append(body, meta);

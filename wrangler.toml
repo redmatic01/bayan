@@ -11,7 +11,7 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "bayan"
-database_id = "DATABASE_ID_PLACEHOLDER"
+database_id = "9eba6f6c-a118-4b18-a15c-8fddd43c29f3"
 
 [observability]
 enabled = true

@@ -145,6 +145,23 @@ function htmlToText(html) {
 
 const UA = { 'user-agent': 'Mozilla/5.0 (Linux; Android 14) bayan-pwa/1.0' };
 
+// stihi.ru отдаёт страницы в windows-1251 без charset в заголовке — Response.text()
+// всегда декодирует как UTF-8, поэтому тут нужен ручной TextDecoder.
+async function fetchWin1251(url) {
+  const buf = await (await fetch(url, { headers: UA })).arrayBuffer();
+  return new TextDecoder('windows-1251').decode(buf);
+}
+
+// Внутри одной публикации авторы иногда склеивают несколько коротких
+// стихов через строку-разделитель «---» — режем на отдельные карточки,
+// иначе одна карточка растягивается на десяток четверостиший.
+function splitOnDashRule(text) {
+  return text
+    .split(/\n[ \t]*-{3,}[ \t]*\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 // ---------- parsers ----------
 
 const PARSERS = {
@@ -180,6 +197,25 @@ const PARSERS = {
     for (const m of html.matchAll(/<div class="col-xs-12" style="margin:0\.5em[^"]*">([\s\S]*?)<\/div>/g)) {
       const t = htmlToText(m[1]);
       if (t) out.push(t);
+    }
+    return out;
+  },
+
+  // stihi.ru: url — страница автора (https://stihi.ru/avtor/<slug>).
+  // Обходит список его произведений, из каждого забирает <div class="text">
+  // и режет по «---» на отдельные короткие вещи.
+  async stihiru(url) {
+    const authorHtml = await fetchWin1251(url);
+    const links = new Set();
+    for (const m of authorHtml.matchAll(/href="(\/\d{4}\/\d{2}\/\d{2}\/\d+)"/g)) links.add(m[1]);
+
+    const out = [];
+    for (const path of links) {
+      const html = await fetchWin1251(`https://stihi.ru${path}`);
+      const m = html.match(/class="text">([\s\S]*?)<\/div>/);
+      if (!m) continue;
+      const text = htmlToText(m[1]);
+      out.push(...splitOnDashRule(text));
     }
     return out;
   },

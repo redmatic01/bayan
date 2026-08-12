@@ -190,17 +190,6 @@ const PARSERS = {
     return out;
   },
 
-  // killpls.me: истории в <div class="col-xs-12" style="margin:0.5em 0;...">
-  async killpls(url) {
-    const html = await (await fetch(url, { headers: UA })).text();
-    const out = [];
-    for (const m of html.matchAll(/<div class="col-xs-12" style="margin:0\.5em[^"]*">([\s\S]*?)<\/div>/g)) {
-      const t = htmlToText(m[1]);
-      if (t) out.push(t);
-    }
-    return out;
-  },
-
   // stihi.ru: url — страница автора (https://stihi.ru/avtor/<slug>).
   // Обходит список его произведений, из каждого забирает <div class="text">
   // и режет по «---» на отдельные короткие вещи.

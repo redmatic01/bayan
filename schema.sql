@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS config (
 );
 INSERT OR IGNORE INTO config (key, value) VALUES ('filter_enabled', '0');
 INSERT OR IGNORE INTO config (key, value) VALUES ('filter_prompt', '');
-INSERT OR IGNORE INTO config (key, value) VALUES ('sources', '[{"type":"anekdotru","name":"anekdot.ru","url":"https://www.anekdot.ru/rss/export_j.xml"},{"type":"tme","name":"t.me/baneks","url":"https://t.me/s/baneks"},{"type":"tme","name":"t.me/anekdotiki","url":"https://t.me/s/anekdotiki"},{"type":"killpls","name":"killpls.me","url":"https://killpls.me/"},{"type":"stihiru","name":"stihi.ru/danila08","url":"https://stihi.ru/avtor/danila08"}]');
+INSERT OR IGNORE INTO config (key, value) VALUES ('sources', '[{"type": "anekdotru", "name": "anekdot.ru", "url": "https://www.anekdot.ru/rss/export_j.xml"}, {"type": "tme", "name": "t.me/baneks", "url": "https://t.me/s/baneks"}, {"type": "tme", "name": "t.me/anekdotiki", "url": "https://t.me/s/anekdotiki"}, {"type": "stihiru", "name": "stihi.ru/danila08", "url": "https://stihi.ru/avtor/danila08"}]');
 
 -- Первый анекдот коллекции — через очередь, как договаривались.
 INSERT OR IGNORE INTO items (text, hash, source, status) VALUES (

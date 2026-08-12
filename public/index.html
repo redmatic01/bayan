@@ -4,20 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Баян</title>
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f4ef">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#131316">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fffefb">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#201515">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <style>
+/* Палитра Zapier: кремовая бумага вместо белого, тёплый чёрный вместо чёрного,
+   один оранжевый акцент. Структуру держат рамки — теней нет. */
 :root {
-  --bg: #f6f4ef; --card: #ffffff; --text: #1c1b19; --muted: #8a867d;
-  --accent: #c98a00; --line: #e6e2d8; --danger: #b3402e; --ok: #3d7a3d;
+  --bg: #fffefb; --card: #fffefb; --surface: #eceae3; --text: #201515; --body: #36342e;
+  /* на шаг темнее заперовского #939084 — иначе мелкие подписи дают 3.2:1 вместо 4.5:1 */
+  --muted: #757168; --accent: #ff4f00; --line: #c5c0b1;
+  --ok: #ff4f00;      /* «в банк» — единственное вивидное действие */
+  --danger: #939084;  /* «мимо» — тихий отказ, не тревога */
 }
 @media (prefers-color-scheme: dark) {
+  /* Тёмная тема — это подвал Zapier: тёплый чёрный, кремовый текст, песочные рамки. */
   :root {
-    --bg: #131316; --card: #1d1d22; --text: #e8e6e1; --muted: #77747c;
-    --accent: #f0b429; --line: #2a2a31; --danger: #e06c55; --ok: #6cb56c;
+    --bg: #201515; --card: #2b1e1e; --surface: #36342e; --text: #fffefb; --body: #e4e0d7;
+    --muted: #a8a49a; --accent: #ff5c14; --line: #4a3a36;
+    --ok: #ff5c14; --danger: #a8a49a;
   }
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -43,27 +50,27 @@ header .counter { color: var(--muted); font-size: 14px; font-variant-numeric: ta
   flex: 0 0 auto; border: 1px solid var(--line); border-radius: 999px;
   padding: 3px 12px; font-size: 13px; color: var(--muted); background: none; cursor: pointer;
 }
-.chip.active { border-color: var(--accent); color: var(--accent); }
+/* оранжевый — только рамка-индикатор; текст тёмный, иначе 13px нечитаемы */
+.chip.active { border-color: var(--accent); color: var(--text); font-weight: 600; }
 
 main { flex: 1; min-height: 0; position: relative; }
 
 /* --- карточка --- */
 .stage { position: absolute; inset: 0; padding: 4px 16px 12px; display: flex; }
 .card {
-  flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+  flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 8px;
   padding: 22px 20px; display: flex; flex-direction: column;
-  box-shadow: 0 4px 18px rgba(0,0,0,.06);
   touch-action: pan-y; user-select: none; position: relative; overflow: hidden;
 }
 .card .body {
-  flex: 1; overflow-y: auto; display: flex; align-items: center;
+  flex: 1; overflow-y: auto; display: flex; align-items: center; color: var(--body);
   font-size: 20px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
 }
 .card .body > div { max-height: 100%; width: 100%; }
 .card .meta { color: var(--muted); font-size: 13px; padding-top: 10px; display: flex; gap: 10px; }
 .card .stamp {
   position: absolute; top: 18px; font-size: 30px; font-weight: 800; opacity: 0;
-  border: 3px solid; border-radius: 10px; padding: 2px 12px; transform: rotate(-12deg);
+  border: 3px solid; border-radius: 4px; padding: 2px 12px; transform: rotate(-12deg);
   pointer-events: none;
 }
 .card .stamp.yes { left: 16px; color: var(--ok); border-color: var(--ok); }
@@ -89,31 +96,37 @@ nav button {
   font-size: 11px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px;
 }
 nav button .ico { font-size: 21px; line-height: 1; }
-nav button.active { color: var(--accent); }
+/* приём Zapier: активная вкладка помечается полосой (inset box-shadow), а не цветом текста */
+nav button.active { color: var(--text); box-shadow: inset 0 3px 0 0 var(--accent); }
 nav button .badge {
-  position: absolute; margin-left: 26px; margin-top: -4px; background: var(--accent); color: #fff;
+  position: absolute; margin-left: 26px; margin-top: -4px; background: var(--accent); color: #fffefb;
   border-radius: 999px; font-size: 10px; min-width: 16px; padding: 1px 4px; font-weight: 700;
 }
 
 /* --- списки (избранное/поиск) --- */
 .list { position: absolute; inset: 0; overflow-y: auto; padding: 4px 16px 16px; }
 .list .item {
-  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
-  padding: 14px 16px; margin-bottom: 10px; white-space: pre-wrap; word-break: break-word; font-size: 16px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 5px;
+  padding: 14px 16px; margin-bottom: 10px; white-space: pre-wrap; word-break: break-word;
+  font-size: 16px; color: var(--body);
 }
 .list .item .meta { color: var(--muted); font-size: 12px; margin-top: 8px; display: flex; gap: 12px; align-items: center; }
 .list .item .meta button { background: none; border: 0; cursor: pointer; font-size: 16px; padding: 0; color: var(--muted); }
 .list .item .meta button.on { color: var(--danger); }
 .searchbox { position: sticky; top: 0; padding: 2px 0 10px; background: var(--bg); }
 .searchbox input {
-  width: 100%; border: 1px solid var(--line); border-radius: 12px; background: var(--card);
+  width: 100%; border: 1px solid var(--line); border-radius: 5px; background: var(--card);
   color: var(--text); font-size: 16px; padding: 11px 14px; outline: none;
 }
+.searchbox input:focus { border-color: var(--accent); }
 .empty { color: var(--muted); text-align: center; margin-top: 40vh; transform: translateY(-50%); padding: 0 30px; }
+/* Основной CTA по Zapier: заливка оранжевым, скромный радиус, щедрые поля. */
 .center-btn {
-  display: block; margin: 14px auto 0; border: 1px solid var(--accent); color: var(--accent);
-  background: none; border-radius: 999px; padding: 9px 22px; font-size: 15px; cursor: pointer;
+  display: block; margin: 14px auto 0; border: 1px solid var(--accent); color: #fffefb;
+  background: var(--accent); border-radius: 4px; padding: 12px 24px;
+  font-size: 15px; font-weight: 600; cursor: pointer;
 }
+.center-btn:active { transform: scale(.97); }
 #ingestlog { font-size: 13px; color: var(--muted); white-space: pre-line; text-align: left; margin-top: 12px; }
 
 #toast {

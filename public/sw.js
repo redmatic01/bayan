@@ -1,6 +1,7 @@
 // bayan service worker: офлайн-оболочка + кэш банка (network-first).
-const SHELL = 'bayan-shell-v1';
-const DATA = 'bayan-data-v1';
+// v2 — смена палитры на Zapier: старый кэш надо сбросить, иначе останется прежний CSS.
+const SHELL = 'bayan-shell-v2';
+const DATA = 'bayan-data-v2';
 const SHELL_URLS = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {

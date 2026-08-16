@@ -415,16 +415,25 @@ async function ingest(container) {
   try {
     const sources = (await (await fetch('/api/sources')).json()).sources;
     const lines = [];
+    let totalAdded = 0;
     for (let i = 0; i < sources.length; i++) {
       lines[i] = `${sources[i].name}: …`; log.textContent = lines.join('\n');
       try {
         const r = await (await fetch('/api/ingest', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ index: i }) })).json();
         lines[i] = r.error ? `${r.source}: ошибка` : `${r.source}: +${r.added} (из ${r.found})`;
+        if (!r.error) totalAdded += r.added;
       } catch { lines[i] = `${sources[i].name}: ошибка сети`; }
       log.textContent = lines.join('\n');
     }
     await loadQueue();
-    setTimeout(render, 900);
+    if (totalAdded > 0) {
+      // очередь пополнилась — переключаемся на карточки с небольшой паузой, чтобы лог успел прочитаться
+      setTimeout(render, 900);
+    } else {
+      // render() тут же снёс бы этот лог, пересобрав пустой экран заново — оставляем как есть и поясняем итог
+      log.textContent = lines.join('\n') + '\n\nНичего нового — источники уже разобраны.';
+      if (btn) btn.disabled = false;
+    }
   } catch {
     log.textContent = 'Не получилось — нет сети?';
     if (btn) btn.disabled = false;

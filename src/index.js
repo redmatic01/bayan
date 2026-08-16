@@ -10,7 +10,34 @@ export default {
       return json({ error: String(e && e.message || e) }, 500);
     }
   },
+
+  // Ежедневный крон 04:00 UTC (07:00 МСК, см. wrangler.toml). Тихо добирает
+  // очередь до QUEUE_CAP — без уведомлений, результат виден бейджем в «Разборе».
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(dailyTopUp(env));
+  },
 };
+
+const QUEUE_CAP = 40;
+
+async function queuedCount(env) {
+  return env.DB.prepare("SELECT COUNT(*) AS n FROM items WHERE status='queued'").first('n');
+}
+
+async function dailyTopUp(env) {
+  if ((await queuedCount(env)) >= QUEUE_CAP) return; // уже полно — источники не трогаем
+  const sources = await getSources(env);
+  const status = (await getConfig(env, 'filter_enabled')) === '1' ? 'raw' : 'queued';
+  for (const src of sources) {
+    try {
+      const texts = await PARSERS[src.type](src.url);
+      for (const t of texts) await insertItem(env, t, src.name, status);
+    } catch {
+      // источник недоступен этой ночью — идём дальше, как и ручная кнопка
+    }
+    if ((await queuedCount(env)) >= QUEUE_CAP) break; // без обрезки — берём источник целиком
+  }
+}
 
 async function route(request, url, env) {
   const p = url.pathname;

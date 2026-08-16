@@ -15,3 +15,7 @@ database_id = "9eba6f6c-a118-4b18-a15c-8fddd43c29f3"
 
 [observability]
 enabled = true
+
+[triggers]
+# 04:00 UTC = 07:00 МСК — тихое автопополнение очереди до QUEUE_CAP (см. src/index.js scheduled()).
+crons = ["0 4 * * *"]

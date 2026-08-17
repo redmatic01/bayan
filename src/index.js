@@ -99,6 +99,24 @@ async function route(request, url, env) {
     return json({ source: src.name, found: texts.length, added });
   }
 
+  // Ручная догрузка архива — отдельно от «принести свежих» и от ночного крона,
+  // никак не завязана на QUEUE_CAP: жмёт пользователь, когда сам решит.
+  if (p === '/api/archive' && m === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    const sources = await getSources(env);
+    const idx = Number(body.index);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= sources.length) return json({ error: 'bad index' }, 400);
+    const src = sources[idx];
+    const walker = ARCHIVE_PARSERS[src.type];
+    if (!walker) return json({ source: src.name, error: 'no archive for this source', added: 0 });
+    try {
+      const { added, done } = await walker(env, src);
+      return json({ source: src.name, added, done });
+    } catch (e) {
+      return json({ source: src.name, error: String(e && e.message || e), added: 0 });
+    }
+  }
+
   if (p === '/api/stats' && m === 'GET') {
     const { results } = await env.DB.prepare('SELECT status, COUNT(*) AS n FROM items GROUP BY status').all();
     return json({ stats: Object.fromEntries(results.map((r) => [r.status, r.n])) });
@@ -119,6 +137,12 @@ function json(obj, status = 200) {
 async function getConfig(env, key) {
   const v = await env.DB.prepare('SELECT value FROM config WHERE key=?').bind(key).first('value');
   return v == null ? '' : v;
+}
+
+async function setConfig(env, key, value) {
+  await env.DB.prepare(
+    'INSERT INTO config (key, value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value'
+  ).bind(key, value).run();
 }
 
 async function getSources(env) {
@@ -235,4 +259,83 @@ const PARSERS = {
     }
     return out;
   },
+};
+
+// ---------- обходчики архива (кнопка «Добрать архив», не связаны с PARSERS/крон-топ-апом) ----------
+// Курсор «докуда дошли» лежит в config под ключом archive_cursor:<имя источника>,
+// чтобы каждое нажатие продолжало с прошлого места, а не перечёсывало то же самое.
+
+const ARCHIVE_DAYS_PER_RUN = 14; // за один заход по кнопке — не упереться в лимит времени воркера
+const ARCHIVE_DEPTH_DAYS = 365;  // «последний год», см. договорённость с пользователем
+const ARCHIVE_TME_PAGES_PER_RUN = 5; // ~20 сообщений на страницу зеркала → ~100 за заход
+
+function fmtDate(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+// anekdot.ru: архив по дням — https://www.anekdot.ru/release/anekdot/day/YYYY-MM-DD/.
+// Курсор — дата последнего уже обработанного дня, шагаем назад.
+async function archiveAnekdotru(env, src) {
+  const cursorKey = 'archive_cursor:' + src.name;
+  const cur = await getConfig(env, cursorKey);
+  const day = cur ? new Date(cur + 'T00:00:00Z') : new Date();
+  if (!cur) day.setUTCDate(day.getUTCDate() - 1); // курсора ещё нет — начинаем со вчера (сегодня уже покрыт «Принести свежих»)
+
+  const limit = new Date();
+  limit.setUTCDate(limit.getUTCDate() - ARCHIVE_DEPTH_DAYS);
+
+  const status = (await getConfig(env, 'filter_enabled')) === '1' ? 'raw' : 'queued';
+  let added = 0, done = false;
+
+  for (let i = 0; i < ARCHIVE_DAYS_PER_RUN; i++) {
+    if (day < limit) { done = true; break; }
+    const ds = fmtDate(day);
+    try {
+      const html = await (await fetch(`https://www.anekdot.ru/release/anekdot/day/${ds}/`, { headers: UA })).text();
+      for (const m of html.matchAll(/<div class="topicbox"[^>]*data-t="j"[^>]*>\s*<div class="text">([\s\S]*?)<\/div>/g)) {
+        const t = htmlToText(m[1]);
+        if (t && await insertItem(env, t, src.name, status)) added++;
+      }
+    } catch {
+      // этот день не отдался — идём дальше, курсор всё равно продвинется
+    }
+    day.setUTCDate(day.getUTCDate() - 1);
+  }
+  await setConfig(env, cursorKey, fmtDate(day));
+  return { added, done };
+}
+
+// Веб-зеркало Telegram: постранично назад через ?before=<id>.
+// Курсор — минимальный увиденный id; пустая страница = дошли до начала канала.
+async function archiveTme(env, src) {
+  const cursorKey = 'archive_cursor:' + src.name;
+  let before = await getConfig(env, cursorKey);
+  const status = (await getConfig(env, 'filter_enabled')) === '1' ? 'raw' : 'queued';
+  let added = 0, done = false;
+
+  for (let i = 0; i < ARCHIVE_TME_PAGES_PER_RUN; i++) {
+    const pageUrl = before ? `${src.url}?before=${before}` : src.url;
+    let html;
+    try {
+      html = await (await fetch(pageUrl, { headers: UA })).text();
+    } catch {
+      break; // сеть подвела — сохраним курсор там, где остановились, попробуем в другой раз
+    }
+    const ids = [...html.matchAll(/data-post="[^"]+\/(\d+)"/g)].map((mm) => Number(mm[1]));
+    if (!ids.length) { done = true; break; } // дальше зеркало ничего не отдаёт — начало канала
+
+    for (const m of html.matchAll(/class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/g)) {
+      const t = htmlToText(m[1]);
+      if (t && !/^Channel (name|photo|was)/i.test(t) && await insertItem(env, t, src.name, status)) added++;
+    }
+    before = String(Math.min(...ids));
+  }
+  if (before) await setConfig(env, cursorKey, before);
+  return { added, done };
+}
+
+const ARCHIVE_PARSERS = {
+  anekdotru: archiveAnekdotru,
+  tme: archiveTme,
+  // stihiru сознательно нет — у автора конечный список произведений, уже весь разобран целиком.
 };

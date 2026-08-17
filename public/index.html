@@ -36,6 +36,11 @@ header {
 header h1 { font-size: 17px; margin: 0; font-weight: 700; letter-spacing: .02em; }
 header .spacer { flex: 1; }
 header .counter { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+.headerbtn {
+  border: 1px solid var(--line); background: none; color: var(--muted);
+  font-size: 12px; padding: 4px 10px; border-radius: 4px; cursor: pointer; margin-right: 10px;
+}
+.headerbtn:disabled { opacity: .5; }
 
 #tagbar { display: flex; gap: 6px; overflow-x: auto; padding: 2px 16px 8px; scrollbar-width: none; }
 #tagbar::-webkit-scrollbar { display: none; }
@@ -143,6 +148,7 @@ nav button .badge {
   <header>
     <h1 id="title">Баян</h1>
     <div class="spacer"></div>
+    <button id="archivebtn" class="hidden headerbtn" title="Догрузить старые анекдоты за прошлые периоды">Архив</button>
     <div class="counter" id="counter"></div>
   </header>
   <div id="tagbar" class="hidden"></div>
@@ -298,6 +304,7 @@ function toggleFav(id, btn) {
 // ---------- экраны ----------
 function render() {
   document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  $('#archivebtn').classList.toggle('hidden', view !== 'review');
   tagbar.classList.add('hidden');
   actions.innerHTML = ''; counter.textContent = '';
   if (view === 'reader') renderReader();
@@ -440,6 +447,30 @@ async function ingest(container) {
   }
 }
 
+// Догрузка архива за прошлые периоды — отдельная кнопка в шапке, не завязана
+// на пустую очередь и не участвует в ночном лимите QUEUE_CAP.
+async function archiveBackfill() {
+  const btn = $('#archivebtn');
+  if (!btn || btn.disabled) return;
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Копаю…';
+  try {
+    const sources = (await (await fetch('/api/sources')).json()).sources;
+    const parts = [];
+    for (let i = 0; i < sources.length; i++) {
+      try {
+        const r = await (await fetch('/api/archive', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ index: i }) })).json();
+        if (!r.error) parts.push(`${r.source}: +${r.added}${r.done ? ' (архив исчерпан)' : ''}`);
+      } catch { /* сеть подвела — пропускаем источник, курсор не трогали */ }
+    }
+    toast(parts.length ? parts.join(' · ') : 'Нечего добирать');
+    await loadQueue();
+    if (view === 'review') render();
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+}
+
 function listItem(it) {
   const d = document.createElement('div'); d.className = 'item';
   const body = document.createElement('div'); body.textContent = it.text;
@@ -489,6 +520,7 @@ function renderSearch() {
 document.querySelectorAll('nav button').forEach((b) => {
   b.onclick = () => { view = b.dataset.view; if (view === 'review') loadQueue().then(render); render(); };
 });
+$('#archivebtn').onclick = archiveBackfill;
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
 syncDeck();
 render();

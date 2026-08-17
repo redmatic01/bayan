@@ -1,7 +1,7 @@
 // bayan service worker: офлайн-оболочка + кэш банка (network-first).
-// v3 — SVG-иконки вместо эмодзи, теги: старый кэш надо сбросить.
-const SHELL = 'bayan-shell-v3';
-const DATA = 'bayan-data-v3';
+// v4 — кнопка «Архив» в шапке: старый кэш надо сбросить.
+const SHELL = 'bayan-shell-v4';
+const DATA = 'bayan-data-v4';
 const SHELL_URLS = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {

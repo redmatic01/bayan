@@ -29,6 +29,7 @@ async function dailyTopUp(env) {
   const sources = await getSources(env);
   const status = (await getConfig(env, 'filter_enabled')) === '1' ? 'raw' : 'queued';
   for (const src of sources) {
+    if (!PARSERS[src.type]) continue; // архивные тег-источники крон не трогает
     try {
       const texts = await PARSERS[src.type](src.url);
       for (const t of texts) await insertItem(env, t, src.name, status);
@@ -51,11 +52,35 @@ async function route(request, url, env) {
   }
 
   if (p === '/api/queue' && m === 'GET') {
+    // Фильтр по кластеру: кластер лежит первым тегом в items.tags (ставится при загрузке тег-источника).
+    // «прочее» — всё, где ни одного известного кластера (старые источники, ручные добавления).
+    const clusters = await knownClusters(env);
+    const want = url.searchParams.get('cluster') || '';
+    const hasCl = (c) => `(',' || tags || ',') LIKE '%,' || ? || ',%'`;
+    let where = "status='queued'", binds = [];
+    if (want === 'прочее') {
+      where += clusters.map(() => ` AND NOT ${hasCl()}`).join('');
+      binds = [...clusters];
+    } else if (want) {
+      where += ` AND ${hasCl()}`;
+      binds = [want];
+    }
     const { results } = await env.DB.prepare(
-      "SELECT id, text, source, created_at FROM items WHERE status='queued' ORDER BY id LIMIT 200"
-    ).all();
+      `SELECT id, text, source, tags, created_at FROM items WHERE ${where} ORDER BY id LIMIT 200`
+    ).bind(...binds).all();
+    const matching = await env.DB.prepare(`SELECT COUNT(*) AS n FROM items WHERE ${where}`).bind(...binds).first('n');
     const total = await env.DB.prepare("SELECT COUNT(*) AS n FROM items WHERE status='queued'").first('n');
-    return json({ items: results, total });
+    // счётчики по кластерам для чипов — по одному дешёвому GROUP BY
+    const { results: grp } = await env.DB.prepare("SELECT tags, COUNT(*) AS n FROM items WHERE status='queued' GROUP BY tags").all();
+    const counts = Object.fromEntries(clusters.map((c) => [c, 0]));
+    let other = 0;
+    for (const g of grp) {
+      const set = (g.tags || '').split(',').map((s) => s.trim());
+      const hit = clusters.filter((c) => set.includes(c));
+      if (hit.length) for (const c of hit) counts[c] += g.n;
+      else other += g.n;
+    }
+    return json({ items: results, total, matching, clusters: counts, other });
   }
 
   if (p === '/api/decide' && m === 'POST') {
@@ -87,6 +112,8 @@ async function route(request, url, env) {
     const idx = Number(body.index);
     if (!Number.isInteger(idx) || idx < 0 || idx >= sources.length) return json({ error: 'bad index' }, 400);
     const src = sources[idx];
+    // тег-источники — конечные топы, живут только под «Архивом»; «свежих» у них не бывает
+    if (!PARSERS[src.type]) return json({ source: src.name, found: 0, added: 0, skipped: true });
     const status = (await getConfig(env, 'filter_enabled')) === '1' ? 'raw' : 'queued';
     let texts = [];
     try {
@@ -153,6 +180,11 @@ async function getSources(env) {
   }
 }
 
+// Кластеры = уникальные cluster у источников (персонажи, отношения, работа…).
+async function knownClusters(env) {
+  return [...new Set((await getSources(env)).map((s) => s.cluster).filter(Boolean))];
+}
+
 // Нормализация для дедупа: только буквы и цифры, нижний регистр, ё=е.
 function normalize(text) {
   return text.toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/g, '');
@@ -163,13 +195,13 @@ async function sha256hex(s) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function insertItem(env, text, source, status) {
+async function insertItem(env, text, source, status, tags = '') {
   const clean = text.trim();
   if (clean.length < 20 || clean.length > 4000) return false;
   const hash = await sha256hex(normalize(clean));
   const r = await env.DB.prepare(
-    'INSERT OR IGNORE INTO items (text, hash, source, status) VALUES (?,?,?,?)'
-  ).bind(clean, hash, source, status).run();
+    'INSERT OR IGNORE INTO items (text, hash, source, status, tags) VALUES (?,?,?,?,?)'
+  ).bind(clean, hash, source, status, tags).run();
   return r.meta.changes > 0;
 }
 
@@ -334,8 +366,33 @@ async function archiveTme(env, src) {
   return { added, done };
 }
 
+// Тег anekdot.ru: src.url = https://www.anekdot.ru/tags/<slug>/, src.pages — сколько страниц
+// топа брать (≈50 анекдотов на страницу), src.cluster — пишется первым тегом в items.tags.
+// ?type=anekdots отсекает истории/афоризмы с того же тега, ?sort=sum — по сумме голосов.
+// Курсор — номер следующей страницы; done, когда страницы кончились.
+async function archiveAnekdotruTag(env, src) {
+  const cursorKey = 'archive_cursor:' + src.name;
+  const maxPages = Math.max(1, Number(src.pages) || 1);
+  let page = Number(await getConfig(env, cursorKey)) || 1;
+  if (page > maxPages) return { added: 0, done: true };
+
+  const status = (await getConfig(env, 'filter_enabled')) === '1' ? 'raw' : 'queued';
+  const tags = src.cluster || '';
+  let added = 0;
+  const pageUrl = `${src.url}${page > 1 ? page + '/' : ''}?type=anekdots&sort=sum`;
+  const html = await (await fetch(pageUrl, { headers: UA })).text();
+  for (const m of html.matchAll(/<div class="topicbox"[^>]*data-t="j"[^>]*>\s*<div class="text">([\s\S]*?)<\/div>/g)) {
+    const t = htmlToText(m[1]);
+    if (t && await insertItem(env, t, src.name, status, tags)) added++;
+  }
+  page++;
+  await setConfig(env, cursorKey, String(page));
+  return { added, done: page > maxPages };
+}
+
 const ARCHIVE_PARSERS = {
   anekdotru: archiveAnekdotru,
   tme: archiveTme,
+  anekdotru_tag: archiveAnekdotruTag,
   // stihiru сознательно нет — у автора конечный список произведений, уже весь разобран целиком.
 };

@@ -1,7 +1,7 @@
 // bayan service worker: офлайн-оболочка + кэш банка (network-first).
-// v4 — кнопка «Архив» в шапке: старый кэш надо сбросить.
-const SHELL = 'bayan-shell-v4';
-const DATA = 'bayan-data-v4';
+// v5 — чипы кластеров в «Разборе»: старый кэш надо сбросить.
+const SHELL = 'bayan-shell-v5';
+const DATA = 'bayan-data-v5';
 const SHELL_URLS = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {

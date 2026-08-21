@@ -214,12 +214,15 @@ async function loadBank() {
   } catch { /* офлайн — живём на кэше */ }
   syncDeck();
 }
+let reviewCluster = LS.get('bayan_review_cluster', ''); // '' = все, 'прочее' = без кластера
+let queueClusters = {}, queueOther = 0, queueMatching = 0;
 async function loadQueue() {
   try {
-    const r = await fetch('/api/queue');
+    const r = await fetch('/api/queue' + (reviewCluster ? '?cluster=' + encodeURIComponent(reviewCluster) : ''));
     if (!r.ok) throw 0;
     const d = await r.json();
     queue = d.items; queueTotal = d.total;
+    queueClusters = d.clusters || {}; queueOther = d.other || 0; queueMatching = d.matching ?? d.total;
   } catch { queue = null; }
   updateBadge();
 }
@@ -382,9 +385,27 @@ function renderReview() {
   const stage = document.createElement('div'); stage.className = 'stage'; main.append(stage);
 
   if (queue === null) { stage.innerHTML = '<div class="empty">Нет сети — разбор работает только онлайн.</div>'; return; }
+
+  // чипы кластеров — чтобы не надоедала одна категория; тот же #tagbar, что и в читалке
+  const names = Object.keys(queueClusters).filter((c) => queueClusters[c] > 0);
+  if (names.length || queueOther) {
+    tagbar.classList.remove('hidden');
+    tagbar.innerHTML = '';
+    const mk = (label, val, n) => {
+      const b = document.createElement('button');
+      b.className = 'chip' + (reviewCluster === val ? ' active' : '');
+      b.textContent = n == null ? label : `${label} ${n}`;
+      b.onclick = () => { reviewCluster = val; LS.set('bayan_review_cluster', val); loadQueue().then(render); };
+      return b;
+    };
+    tagbar.append(mk('все', '', queueTotal));
+    for (const c of names) tagbar.append(mk(c, c, queueClusters[c]));
+    if (queueOther) tagbar.append(mk('прочее', 'прочее', queueOther));
+  }
+
   if (!queue.length) {
     const d = document.createElement('div'); d.className = 'empty';
-    d.textContent = 'Очередь пуста.';
+    d.textContent = reviewCluster ? 'В этом кластере всё разобрано.' : 'Очередь пуста.';
     const b = document.createElement('button'); b.className = 'center-btn'; b.textContent = 'Принести свежих';
     b.onclick = () => ingest(d);
     const log = document.createElement('div'); log.id = 'ingestlog';
@@ -393,12 +414,16 @@ function renderReview() {
     return;
   }
   const it = queue[0];
-  counter.textContent = `в очереди: ${queueTotal}`;
+  counter.textContent = reviewCluster ? `${queueMatching} из ${queueTotal}` : `в очереди: ${queueTotal}`;
   const c = cardEl(it.text, it.source, true);
   stage.append(c);
 
   const decide = async (action) => {
-    queue.shift(); queueTotal--; vibrate(12); updateBadge(); render();
+    queue.shift(); queueTotal--; queueMatching--; vibrate(12); updateBadge();
+    if (reviewCluster && queueClusters[reviewCluster] != null) queueClusters[reviewCluster]--;
+    else if (reviewCluster === 'прочее') queueOther--;
+    // клиент держит только первые 200 — когда они кончились, а на сервере ещё есть, дотягиваем
+    if (!queue.length && queueMatching > 0) loadQueue().then(render); else render();
     try {
       await fetch('/api/decide', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: it.id, action }) });
       if (action === 'approve') loadBank();
@@ -456,14 +481,17 @@ async function archiveBackfill() {
   btn.disabled = true; btn.textContent = 'Копаю…';
   try {
     const sources = (await (await fetch('/api/sources')).json()).sources;
-    const parts = [];
+    let added = 0, done = 0, n = 0;
     for (let i = 0; i < sources.length; i++) {
+      btn.textContent = `Копаю… ${i + 1}/${sources.length}`;
       try {
         const r = await (await fetch('/api/archive', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ index: i }) })).json();
-        if (!r.error) parts.push(`${r.source}: +${r.added}${r.done ? ' (архив исчерпан)' : ''}`);
+        if (r.error) continue;
+        n++; added += r.added; if (r.done) done++;
       } catch { /* сеть подвела — пропускаем источник, курсор не трогали */ }
     }
-    toast(parts.length ? parts.join(' · ') : 'Нечего добирать');
+    // десятки тег-источников — построчный отчёт не влезет в тост, даём сводку
+    toast(n ? `+${added} · исчерпано ${done} из ${n} источников` : 'Нечего добирать');
     await loadQueue();
     if (view === 'review') render();
   } finally {

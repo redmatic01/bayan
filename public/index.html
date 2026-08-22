@@ -192,7 +192,7 @@ let deck = LS.get('bayan_deck_v1', null);        // {order:[ids], pos, tag}
 let favs = new Set(LS.get('bayan_favs', []));
 let queue = [];                                  // кандидаты на разбор
 let queueTotal = 0;
-let view = 'reader';
+let view = 'review'; // по умолчанию открываемся на «Разборе» — так попросил пользователь
 
 const $ = (s) => document.querySelector(s);
 const main = $('#main'), actions = $('#actions'), counter = $('#counter'), tagbar = $('#tagbar');
@@ -553,7 +553,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
 syncDeck();
 render();
 loadBank();
-loadQueue();
+loadQueue().then(() => { if (view === 'review') render(); }); // первый рендер был с пустой очередью
 </script>
 </body>
 </html>
